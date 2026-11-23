@@ -6,7 +6,13 @@ export async function POST(request: Request) {
   try {
     const data = await request.json();
 
-    if (!data.name || !data.whatsapp || !data.date || !data.service) {
+    if (
+      !data.name ||
+      !data.whatsapp ||
+      !data.date ||
+      !data.service ||
+      !data.vehicle
+    ) {
       return NextResponse.json(
         { success: false, message: "Please complete all required fields." },
         { status: 400 }
@@ -15,7 +21,6 @@ export async function POST(request: Request) {
 
     const vehicle = data.vehicle;
     const duration = data.duration || "";
-
     let packageOption = "";
     let amount = 0;
 
@@ -26,12 +31,17 @@ export async function POST(request: Request) {
       else if (vehicle === "Sedan" && duration === "8 Hours") amount = 350;
       else if (vehicle === "MPV" && duration === "4 Hours") amount = 350;
       else if (vehicle === "MPV" && duration === "8 Hours") amount = 450;
+
     } else if (data.service === "Airport Transfer") {
-      packageOption = `${vehicle} Airport Transfer`;
-      amount = vehicle === "Sedan" ? 60 : 90;
+      packageOption = `${vehicle} - Airport Transfer`;
+
+      if (vehicle === "Sedan") amount = 60;
+      else if (vehicle === "MPV") amount = 90;
+
     } else if (data.service === "ATV Fun Ride") {
       packageOption = "1 Hour";
       amount = 250;
+
     } else if (data.service === "Langkawi River Cruise") {
       packageOption = "Private Boat - 3 Hours";
       amount = 750;
@@ -59,10 +69,12 @@ export async function POST(request: Request) {
         travel_date: data.date,
         pickup_time: data.time || null,
         pickup_location: data.location || null,
-        passengers: Number(data.passengers),
-        bags: Number(data.bags),
+        passengers: Number(data.passengers || 1),
+        bags: Number(data.bags || 0),
         special_requests: data.requests || null,
-        amount_myr: amount
+        amount_myr: amount,
+        booking_status: "Pending Review",
+        payment_status: "Unpaid – Cash"
       })
       .select()
       .single();
@@ -72,12 +84,19 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    return NextResponse.json({ success: true, booking });
+    return NextResponse.json({
+      success: true,
+      booking
+    });
 
   } catch (error) {
     console.error("Booking API error:", error);
+
     return NextResponse.json(
-      { success: false, message: "Booking failed. Please try again." },
+      {
+        success: false,
+        message: "Booking failed. Please try again."
+      },
       { status: 500 }
     );
   }
