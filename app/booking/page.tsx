@@ -7,6 +7,81 @@ export default function BookingPage() {
   const [service, setService] = useState("Local Driver Tour");
   const [vehicle, setVehicle] = useState("Sedan");
   const [duration, setDuration] = useState("4 Hours");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const [form, setForm] = useState({
+    name: "",
+    whatsapp: "",
+    date: "",
+    time: "10:00",
+    location: "",
+    passengers: "1",
+    bags: "0",
+    requests: ""
+  });
+
+  const field = {
+    width: "100%",
+    padding: 14,
+    margin: "8px 0 18px",
+    border: "1px solid #ccc",
+    borderRadius: 8,
+    fontSize: 16
+  };
+
+  const label = {
+    display: "block",
+    fontWeight: 600
+  };
+
+  async function submitBooking(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          service,
+          vehicle,
+          duration,
+          passengers: Number(form.passengers),
+          bags: Number(form.bags)
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Booking failed. Please try again.");
+      }
+
+      setMessage(
+        "Booking request submitted successfully. Our team will review and contact you on WhatsApp."
+      );
+
+      setForm({
+        name: "",
+        whatsapp: "",
+        date: "",
+        time: "10:00",
+        location: "",
+        passengers: "1",
+        bags: "0",
+        requests: ""
+      });
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Something went wrong."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main style={{
@@ -19,86 +94,98 @@ export default function BookingPage() {
       <h1>Book Your Langkawi Experience</h1>
       <p>Submit your booking request. We will review and confirm it.</p>
 
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        alert("Booking form completed. Online submission will be connected next.");
-      }}>
-        <label>Full Name</label>
-        <input required placeholder="Your full name" style={field} />
+      <form onSubmit={submitBooking}>
+        <label style={label}>Full Name</label>
+        <input required style={field}
+          value={form.name}
+          onChange={e => setForm({...form, name: e.target.value})}
+          placeholder="Your full name" />
 
-        <label>WhatsApp Number</label>
-        <input required type="tel" placeholder="+60..." style={field} />
+        <label style={label}>WhatsApp Number</label>
+        <input required type="tel" style={field}
+          value={form.whatsapp}
+          onChange={e => setForm({...form, whatsapp: e.target.value})}
+          placeholder="+60..." />
 
-        <label>Choose Service</label>
-        <select value={service}
-          onChange={e => setService(e.target.value)} style={field}>
+        <label style={label}>Choose Service</label>
+        <select style={field} value={service}
+          onChange={e => setService(e.target.value)}>
           <option>Local Driver Tour</option>
           <option>Airport Transfer</option>
           <option>ATV Fun Ride</option>
           <option>Langkawi River Cruise</option>
         </select>
 
-        <label>Vehicle</label>
-        <select value={vehicle}
-          onChange={e => setVehicle(e.target.value)} style={field}>
+        <label style={label}>Vehicle</label>
+        <select style={field} value={vehicle}
+          onChange={e => setVehicle(e.target.value)}>
           <option>Sedan</option>
           <option>MPV</option>
         </select>
 
         {service === "Local Driver Tour" && <>
-          <label>Tour Duration</label>
-          <select value={duration}
-            onChange={e => setDuration(e.target.value)} style={field}>
+          <label style={label}>Tour Duration</label>
+          <select style={field} value={duration}
+            onChange={e => setDuration(e.target.value)}>
             <option>4 Hours</option>
             <option>8 Hours</option>
           </select>
         </>}
 
-        <label>Travel Date</label>
-        <input required type="date" min={new Date().toISOString().split("T")[0]}
-          style={field} />
+        <label style={label}>Travel Date</label>
+        <input required type="date" style={field}
+          min={new Date().toISOString().split("T")[0]}
+          value={form.date}
+          onChange={e => setForm({...form, date: e.target.value})} />
 
-        <label>Pickup Time</label>
-        <input required type="time" min="10:00" style={field} />
+        <label style={label}>Pickup Time</label>
+        <input required type="time" style={field}
+          min={service === "Local Driver Tour" ? "10:00" : undefined}
+          value={form.time}
+          onChange={e => setForm({...form, time: e.target.value})} />
 
-        <label>Pickup Location / Hotel</label>
-        <input required placeholder="Hotel or pickup location" style={field} />
+        <label style={label}>Pickup Location / Hotel</label>
+        <input required style={field}
+          value={form.location}
+          onChange={e => setForm({...form, location: e.target.value})}
+          placeholder="Hotel or pickup location" />
 
-        <label>Number of Passengers</label>
-        <input required type="number" min="1" max={vehicle === "Sedan" ? 3 : 6}
-          defaultValue="1" style={field} />
+        <label style={label}>Number of Passengers</label>
+        <input required type="number" min="1"
+          max={vehicle === "Sedan" ? 3 : 6}
+          style={field}
+          value={form.passengers}
+          onChange={e => setForm({...form, passengers: e.target.value})} />
 
-        <label>Number of Bags</label>
-        <input type="number" min="0" defaultValue="0" style={field} />
+        <label style={label}>Number of Bags</label>
+        <input type="number" min="0"
+          max={vehicle === "Sedan" ? 2 : 4}
+          style={field}
+          value={form.bags}
+          onChange={e => setForm({...form, bags: e.target.value})} />
 
-        <label>Special Requests</label>
-        <textarea placeholder="Any additional requests?"
-          style={{ ...field, minHeight: 90 }} />
+        <label style={label}>Special Requests</label>
+        <textarea style={{...field, minHeight: 90}}
+          value={form.requests}
+          onChange={e => setForm({...form, requests: e.target.value})}
+          placeholder="Any additional requests?" />
 
-        <button type="submit" style={{
-          width: "100%",
-          padding: 16,
-          marginTop: 20,
-          background: "#07877f",
-          color: "white",
-          border: 0,
-          borderRadius: 8,
-          fontSize: 17
-        }}>
-          Submit Booking Request
+        <button type="submit" disabled={loading}
+          style={{
+            width: "100%",
+            padding: 16,
+            background: "#16b8a6",
+            color: "white",
+            border: 0,
+            borderRadius: 8,
+            fontSize: 16,
+            fontWeight: 700
+          }}>
+          {loading ? "Submitting..." : "Submit Booking"}
         </button>
+
+        {message && <p style={{marginTop: 20}}>{message}</p>}
       </form>
     </main>
   );
 }
-
-const field = {
-  display: "block",
-  width: "100%",
-  boxSizing: "border-box" as const,
-  padding: 13,
-  margin: "8px 0 18px",
-  border: "1px solid #ccd8d8",
-  borderRadius: 7,
-  fontSize: 16
-};
