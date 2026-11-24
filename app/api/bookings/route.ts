@@ -9,47 +9,12 @@ export async function POST(request: Request) {
     if (
       !data.name ||
       !data.whatsapp ||
-      !data.date ||
       !data.service ||
-      !data.vehicle
+      !data.vehicle ||
+      !data.date
     ) {
       return NextResponse.json(
         { success: false, message: "Please complete all required fields." },
-        { status: 400 }
-      );
-    }
-
-    const vehicle = data.vehicle;
-    const duration = data.duration || "";
-    let packageOption = "";
-    let amount = 0;
-
-    if (data.service === "Local Driver Tour") {
-      packageOption = `${vehicle} - ${duration}`;
-
-      if (vehicle === "Sedan" && duration === "4 Hours") amount = 250;
-      else if (vehicle === "Sedan" && duration === "8 Hours") amount = 350;
-      else if (vehicle === "MPV" && duration === "4 Hours") amount = 350;
-      else if (vehicle === "MPV" && duration === "8 Hours") amount = 450;
-
-    } else if (data.service === "Airport Transfer") {
-      packageOption = `${vehicle} - Airport Transfer`;
-
-      if (vehicle === "Sedan") amount = 60;
-      else if (vehicle === "MPV") amount = 90;
-
-    } else if (data.service === "ATV Fun Ride") {
-      packageOption = "1 Hour";
-      amount = 250;
-
-    } else if (data.service === "Langkawi River Cruise") {
-      packageOption = "Private Boat - 3 Hours";
-      amount = 750;
-    }
-
-    if (!amount) {
-      return NextResponse.json(
-        { success: false, message: "Invalid service or package." },
         { status: 400 }
       );
     }
@@ -59,9 +24,51 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    let amount = 0;
+    let packageOption = "";
+
+    if (data.service === "Local Driver Tour") {
+      packageOption = `${data.vehicle} - ${data.duration}`;
+
+      if (data.vehicle === "Sedan" && data.duration === "4 Hours") amount = 250;
+      if (data.vehicle === "Sedan" && data.duration === "8 Hours") amount = 350;
+      if (data.vehicle === "MPV" && data.duration === "4 Hours") amount = 350;
+      if (data.vehicle === "MPV" && data.duration === "8 Hours") amount = 450;
+    } else if (data.service === "Airport Transfer") {
+      packageOption = data.vehicle;
+
+      if (data.vehicle === "Sedan") amount = 60;
+      if (data.vehicle === "MPV") amount = 90;
+    } else if (data.service === "ATV") {
+      packageOption = "1 Hour";
+      amount = 250;
+    } else if (data.service === "River Cruise") {
+      packageOption = "Private Boat - 3 Hours";
+      amount = 750;
+    } else {
+      return NextResponse.json(
+        { success: false, message: "Invalid service." },
+        { status: 400 }
+      );
+    }
+
+    const { data: latest } = await supabase
+      .from("bookings")
+      .select("booking_code")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const lastNumber = Number(
+      latest?.booking_code?.replace("LGW-", "") || 0
+    );
+
+    const bookingCode = `LGW-${String(lastNumber + 1).padStart(6, "0")}`;
+
     const { data: booking, error } = await supabase
       .from("bookings")
       .insert({
+        booking_code: bookingCode,
         customer_name: data.name,
         whatsapp: data.whatsapp,
         service: data.service,
@@ -74,29 +81,25 @@ export async function POST(request: Request) {
         special_requests: data.requests || null,
         amount_myr: amount,
         booking_status: "Pending Review",
-        payment_status: "Unpaid – Cash"
+        payment_status: "Unpaid – Cash",
       })
       .select()
       .single();
 
     if (error) {
       console.error("Booking insert error:", error);
-      throw error;
+      return NextResponse.json(
+        { success: false, message: "Booking could not be saved." },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      booking
-    });
-
+    return NextResponse.json({ success: true, booking });
   } catch (error) {
     console.error("Booking API error:", error);
 
     return NextResponse.json(
-      {
-        success: false,
-        message: "Booking failed. Please try again."
-      },
+      { success: false, message: "Booking failed. Please try again." },
       { status: 500 }
     );
   }
