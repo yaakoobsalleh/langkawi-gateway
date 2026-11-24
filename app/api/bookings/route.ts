@@ -2,6 +2,41 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+function supabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+export async function GET(request: Request) {
+  try {
+    const adminKey = request.headers.get("x-admin-key");
+
+    if (!adminKey || adminKey !== process.env.ADMIN_ACCESS_KEY) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const { data, error } = await supabaseAdmin()
+      .from("bookings")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true, bookings: data });
+  } catch (error) {
+    console.error("Admin booking error:", error);
+    return NextResponse.json(
+      { success: false, message: "Unable to load bookings" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const data = await request.json();
@@ -19,11 +54,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
+    const supabase = supabaseAdmin();
     let amount = 0;
     let packageOption = "";
 
@@ -36,9 +67,7 @@ export async function POST(request: Request) {
       if (data.vehicle === "MPV" && data.duration === "8 Hours") amount = 450;
     } else if (data.service === "Airport Transfer") {
       packageOption = data.vehicle;
-
-      if (data.vehicle === "Sedan") amount = 60;
-      if (data.vehicle === "MPV") amount = 90;
+      amount = data.vehicle === "Sedan" ? 60 : 90;
     } else if (data.service === "ATV") {
       packageOption = "1 Hour";
       amount = 250;
@@ -86,18 +115,11 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (error) {
-      console.error("Booking insert error:", error);
-      return NextResponse.json(
-        { success: false, message: "Booking could not be saved." },
-        { status: 500 }
-      );
-    }
+    if (error) throw error;
 
     return NextResponse.json({ success: true, booking });
   } catch (error) {
     console.error("Booking API error:", error);
-
     return NextResponse.json(
       { success: false, message: "Booking failed. Please try again." },
       { status: 500 }
